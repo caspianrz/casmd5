@@ -1,8 +1,15 @@
 #include "cmd5.h"
 
+#if defined(__clang__) || defined(__GNUC__)
+#define rotate_left(x, n) __builtin_rotateleft32((x), (n))
+#elif defined(_MSC_VER)
+#include <intrin.h>
+#define rotate_left(x, n) _rotl((x), (n))
+#else
 static inline const uint32_t rotate_left(const uint32_t x, const uint8_t n) {
   return (x << n) | (x >> (32 - n));
 }
+#endif
 
 static inline const uint32_t F(const uint32_t x, const uint32_t y,
                                const uint32_t z) {
@@ -197,5 +204,5 @@ void cass_md5_finalize(cass_md5_ctx *ctx, unsigned char digest[16]) {
 
   _encode(digest, ctx->state, 16);
 
-  memset(ctx, 0, sizeof (*ctx));
+  memset(ctx, 0, sizeof(*ctx));
 }
