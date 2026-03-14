@@ -1,41 +1,45 @@
 #include "cmd5.h"
 
-#define ROTATE_LEFT(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
+static inline const uint32_t rotate_left(const uint32_t x, const uint8_t n) {
+  return (x << n) | (x >> (32 - n));
+}
+
+static inline const uint32_t F(const uint32_t x, const uint32_t y,
+                               const uint32_t z) {
+  return (x & y) | ((~x) & z);
+}
+
+static inline const uint32_t G(const uint32_t x, const uint32_t y,
+                               const uint32_t z) {
+  return (x & z) | (y & (~z));
+}
+
+static inline const uint32_t H(const uint32_t x, const uint32_t y,
+                               const uint32_t z) {
+  return x ^ y ^ z;
+}
+
+static inline const uint32_t I(const uint32_t x, const uint32_t y,
+                               const uint32_t z) {
+  return y ^ (x | (~z));
+}
+
+/**
+ * All FF, GG, HH, II functions are just same instruction applied with F,G,H,I.
+ * so we just pass F,G,H,I as parameter and use the same function for all
+ * rounds.
+ */
+static inline const uint32_t
+R(const uint32_t (*func)(const uint32_t, const uint32_t, const uint32_t),
+  const uint32_t a, const uint32_t b, const uint32_t c, const uint32_t d,
+  const uint32_t x, const uint8_t s, const uint32_t ac) {
+  return rotate_left(a + func(b, c, d) + x + ac, s) + b;
+}
 
 static unsigned char PADDING[64] = {
     0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
-#define F(x, y, z) (((x) & (y)) | ((~x) & (z)))
-#define G(x, y, z) (((x) & (z)) | ((y) & (~z)))
-#define H(x, y, z) ((x) ^ (y) ^ (z))
-#define I(x, y, z) ((y) ^ ((x) | (~z)))
-
-#define FF(a, b, c, d, x, s, ac)                                               \
-  {                                                                            \
-    (a) += F((b), (c), (d)) + (x) + (uint32_t)(ac);                            \
-    (a) = ROTATE_LEFT((a), (s));                                               \
-    (a) += (b);                                                                \
-  }
-#define GG(a, b, c, d, x, s, ac)                                               \
-  {                                                                            \
-    (a) += G((b), (c), (d)) + (x) + (uint32_t)(ac);                            \
-    (a) = ROTATE_LEFT((a), (s));                                               \
-    (a) += (b);                                                                \
-  }
-#define HH(a, b, c, d, x, s, ac)                                               \
-  {                                                                            \
-    (a) += H((b), (c), (d)) + (x) + (uint32_t)(ac);                            \
-    (a) = ROTATE_LEFT((a), (s));                                               \
-    (a) += (b);                                                                \
-  }
-#define II(a, b, c, d, x, s, ac)                                               \
-  {                                                                            \
-    (a) += I((b), (c), (d)) + (x) + (uint32_t)(ac);                            \
-    (a) = ROTATE_LEFT((a), (s));                                               \
-    (a) += (b);                                                                \
-  }
 
 static void _decode(uint32_t *output, unsigned char *input, uint32_t len) {
   unsigned int i, j;
@@ -53,83 +57,83 @@ void cass_md5_transform(cass_md5_ctx *ctx, unsigned char block[64]) {
   _decode(x, block, 64);
 
   // Round 1
-  FF(aa, bb, cc, dd, x[0], 7, 0xd76aa478);
-  FF(dd, aa, bb, cc, x[1], 12, 0xe8c7b756);
-  FF(cc, dd, aa, bb, x[2], 17, 0x242070db);
-  FF(bb, cc, dd, aa, x[3], 22, 0xc1bdceee);
-  FF(aa, bb, cc, dd, x[4], 7, 0xf57c0faf);
-  FF(dd, aa, bb, cc, x[5], 12, 0x4787c62a);
-  FF(cc, dd, aa, bb, x[6], 17, 0xa8304613);
-  FF(bb, cc, dd, aa, x[7], 22, 0xfd469501);
-  FF(aa, bb, cc, dd, x[8], 7, 0x698098d8);
-  FF(dd, aa, bb, cc, x[9], 12, 0x8b44f7af);
-  FF(cc, dd, aa, bb, x[10], 17, 0xffff5bb1);
-  FF(bb, cc, dd, aa, x[11], 22, 0x895cd7be);
-  FF(aa, bb, cc, dd, x[12], 7, 0x6b901122);
-  FF(dd, aa, bb, cc, x[13], 12, 0xfd987193);
-  FF(cc, dd, aa, bb, x[14], 17, 0xa679438e);
-  FF(bb, cc, dd, aa, x[15], 22, 0x49b40821);
+  aa = R(F, aa, bb, cc, dd, x[0], 7, 0xd76aa478);
+  dd = R(F, dd, aa, bb, cc, x[1], 12, 0xe8c7b756);
+  cc = R(F, cc, dd, aa, bb, x[2], 17, 0x242070db);
+  bb = R(F, bb, cc, dd, aa, x[3], 22, 0xc1bdceee);
+  aa = R(F, aa, bb, cc, dd, x[4], 7, 0xf57c0faf);
+  dd = R(F, dd, aa, bb, cc, x[5], 12, 0x4787c62a);
+  cc = R(F, cc, dd, aa, bb, x[6], 17, 0xa8304613);
+  bb = R(F, bb, cc, dd, aa, x[7], 22, 0xfd469501);
+  aa = R(F, aa, bb, cc, dd, x[8], 7, 0x698098d8);
+  dd = R(F, dd, aa, bb, cc, x[9], 12, 0x8b44f7af);
+  cc = R(F, cc, dd, aa, bb, x[10], 17, 0xffff5bb1);
+  bb = R(F, bb, cc, dd, aa, x[11], 22, 0x895cd7be);
+  aa = R(F, aa, bb, cc, dd, x[12], 7, 0x6b901122);
+  dd = R(F, dd, aa, bb, cc, x[13], 12, 0xfd987193);
+  cc = R(F, cc, dd, aa, bb, x[14], 17, 0xa679438e);
+  bb = R(F, bb, cc, dd, aa, x[15], 22, 0x49b40821);
 
   // Round 2
-  GG(aa, bb, cc, dd, x[1], 5, 0xf61e2562);
-  GG(dd, aa, bb, cc, x[6], 9, 0xc040b340);
-  GG(cc, dd, aa, bb, x[11], 14, 0x265e5a51);
-  GG(bb, cc, dd, aa, x[0], 20, 0xe9b6c7aa);
-  GG(aa, bb, cc, dd, x[5], 5, 0xd62f105d);
-  GG(dd, aa, bb, cc, x[10], 9, 0x2441453);
-  GG(cc, dd, aa, bb, x[15], 14, 0xd8a1e681);
-  GG(bb, cc, dd, aa, x[4], 20, 0xe7d3fbc8);
-  GG(aa, bb, cc, dd, x[9], 5, 0x21e1cde6);
-  GG(dd, aa, bb, cc, x[14], 9, 0xc33707d6);
-  GG(cc, dd, aa, bb, x[3], 14, 0xf4d50d87);
-  GG(bb, cc, dd, aa, x[8], 20, 0x455a14ed);
-  GG(aa, bb, cc, dd, x[13], 5, 0xa9e3e905);
-  GG(dd, aa, bb, cc, x[2], 9, 0xfcefa3f8);
-  GG(cc, dd, aa, bb, x[7], 14, 0x676f02d9);
-  GG(bb, cc, dd, aa, x[12], 20, 0x8d2a4c8a);
+  aa = R(G, aa, bb, cc, dd, x[1], 5, 0xf61e2562);
+  dd = R(G, dd, aa, bb, cc, x[6], 9, 0xc040b340);
+  cc = R(G, cc, dd, aa, bb, x[11], 14, 0x265e5a51);
+  bb = R(G, bb, cc, dd, aa, x[0], 20, 0xe9b6c7aa);
+  aa = R(G, aa, bb, cc, dd, x[5], 5, 0xd62f105d);
+  dd = R(G, dd, aa, bb, cc, x[10], 9, 0x2441453);
+  cc = R(G, cc, dd, aa, bb, x[15], 14, 0xd8a1e681);
+  bb = R(G, bb, cc, dd, aa, x[4], 20, 0xe7d3fbc8);
+  aa = R(G, aa, bb, cc, dd, x[9], 5, 0x21e1cde6);
+  dd = R(G, dd, aa, bb, cc, x[14], 9, 0xc33707d6);
+  cc = R(G, cc, dd, aa, bb, x[3], 14, 0xf4d50d87);
+  bb = R(G, bb, cc, dd, aa, x[8], 20, 0x455a14ed);
+  aa = R(G, aa, bb, cc, dd, x[13], 5, 0xa9e3e905);
+  dd = R(G, dd, aa, bb, cc, x[2], 9, 0xfcefa3f8);
+  cc = R(G, cc, dd, aa, bb, x[7], 14, 0x676f02d9);
+  bb = R(G, bb, cc, dd, aa, x[12], 20, 0x8d2a4c8a);
 
   // Round 3
-  HH(aa, bb, cc, dd, x[5], 4, 0xfffa3942);
-  HH(dd, aa, bb, cc, x[8], 11, 0x8771f681);
-  HH(cc, dd, aa, bb, x[11], 16, 0x6d9d6122);
-  HH(bb, cc, dd, aa, x[14], 23, 0xfde5380c);
-  HH(aa, bb, cc, dd, x[1], 4, 0xa4beea44);
-  HH(dd, aa, bb, cc, x[4], 11, 0x4bdecfa9);
-  HH(cc, dd, aa, bb, x[7], 16, 0xf6bb4b60);
-  HH(bb, cc, dd, aa, x[10], 23, 0xbebfbc70);
-  HH(aa, bb, cc, dd, x[13], 4, 0x289b7ec6);
-  HH(dd, aa, bb, cc, x[0], 11, 0xeaa127fa);
-  HH(cc, dd, aa, bb, x[3], 16, 0xd4ef3085);
-  HH(bb, cc, dd, aa, x[6], 23, 0x4881d05);
-  HH(aa, bb, cc, dd, x[9], 4, 0xd9d4d039);
-  HH(dd, aa, bb, cc, x[12], 11, 0xe6db99e5);
-  HH(cc, dd, aa, bb, x[15], 16, 0x1fa27cf8);
-  HH(bb, cc, dd, aa, x[2], 23, 0xc4ac5665);
+  aa = R(H, aa, bb, cc, dd, x[5], 4, 0xfffa3942);
+  dd = R(H, dd, aa, bb, cc, x[8], 11, 0x8771f681);
+  cc = R(H, cc, dd, aa, bb, x[11], 16, 0x6d9d6122);
+  bb = R(H, bb, cc, dd, aa, x[14], 23, 0xfde5380c);
+  aa = R(H, aa, bb, cc, dd, x[1], 4, 0xa4beea44);
+  dd = R(H, dd, aa, bb, cc, x[4], 11, 0x4bdecfa9);
+  cc = R(H, cc, dd, aa, bb, x[7], 16, 0xf6bb4b60);
+  bb = R(H, bb, cc, dd, aa, x[10], 23, 0xbebfbc70);
+  aa = R(H, aa, bb, cc, dd, x[13], 4, 0x289b7ec6);
+  dd = R(H, dd, aa, bb, cc, x[0], 11, 0xeaa127fa);
+  cc = R(H, cc, dd, aa, bb, x[3], 16, 0xd4ef3085);
+  bb = R(H, bb, cc, dd, aa, x[6], 23, 0x4881d05);
+  aa = R(H, aa, bb, cc, dd, x[9], 4, 0xd9d4d039);
+  dd = R(H, dd, aa, bb, cc, x[12], 11, 0xe6db99e5);
+  cc = R(H, cc, dd, aa, bb, x[15], 16, 0x1fa27cf8);
+  bb = R(H, bb, cc, dd, aa, x[2], 23, 0xc4ac5665);
 
   // Round 4
-  II(aa, bb, cc, dd, x[0], 6, 0xf4292244);
-  II(dd, aa, bb, cc, x[7], 10, 0x432aff97);
-  II(cc, dd, aa, bb, x[14], 15, 0xab9423a7);
-  II(bb, cc, dd, aa, x[5], 21, 0xfc93a039);
-  II(aa, bb, cc, dd, x[12], 6, 0x655b59c3);
-  II(dd, aa, bb, cc, x[3], 10, 0x8f0ccc92);
-  II(cc, dd, aa, bb, x[10], 15, 0xffeff47d);
-  II(bb, cc, dd, aa, x[1], 21, 0x85845dd1);
-  II(aa, bb, cc, dd, x[8], 6, 0x6fa87e4f);
-  II(dd, aa, bb, cc, x[15], 10, 0xfe2ce6e0);
-  II(cc, dd, aa, bb, x[6], 15, 0xa3014314);
-  II(bb, cc, dd, aa, x[13], 21, 0x4e0811a1);
-  II(aa, bb, cc, dd, x[4], 6, 0xf7537e82);
-  II(dd, aa, bb, cc, x[11], 10, 0xbd3af235);
-  II(cc, dd, aa, bb, x[2], 15, 0x2ad7d2bb);
-  II(bb, cc, dd, aa, x[9], 21, 0xeb86d391);
+  aa = R(I, aa, bb, cc, dd, x[0], 6, 0xf4292244);
+  dd = R(I, dd, aa, bb, cc, x[7], 10, 0x432aff97);
+  cc = R(I, cc, dd, aa, bb, x[14], 15, 0xab9423a7);
+  bb = R(I, bb, cc, dd, aa, x[5], 21, 0xfc93a039);
+  aa = R(I, aa, bb, cc, dd, x[12], 6, 0x655b59c3);
+  dd = R(I, dd, aa, bb, cc, x[3], 10, 0x8f0ccc92);
+  cc = R(I, cc, dd, aa, bb, x[10], 15, 0xffeff47d);
+  bb = R(I, bb, cc, dd, aa, x[1], 21, 0x85845dd1);
+  aa = R(I, aa, bb, cc, dd, x[8], 6, 0x6fa87e4f);
+  dd = R(I, dd, aa, bb, cc, x[15], 10, 0xfe2ce6e0);
+  cc = R(I, cc, dd, aa, bb, x[6], 15, 0xa3014314);
+  bb = R(I, bb, cc, dd, aa, x[13], 21, 0x4e0811a1);
+  aa = R(I, aa, bb, cc, dd, x[4], 6, 0xf7537e82);
+  dd = R(I, dd, aa, bb, cc, x[11], 10, 0xbd3af235);
+  cc = R(I, cc, dd, aa, bb, x[2], 15, 0x2ad7d2bb);
+  bb = R(I, bb, cc, dd, aa, x[9], 21, 0xeb86d391);
 
   ctx->state[0] += aa;
   ctx->state[1] += bb;
   ctx->state[2] += cc;
   ctx->state[3] += dd;
 
-  // TODO: for security reasons we should zeroize the x buffer.
+  memset(x, 0, sizeof(x));
 }
 
 void cass_md5_initialize(cass_md5_ctx *ctx) {
@@ -193,17 +197,5 @@ void cass_md5_finalize(cass_md5_ctx *ctx, unsigned char digest[16]) {
 
   _encode(digest, ctx->state, 16);
 
-  // TODO: zero out
+  memset(ctx, 0, sizeof (*ctx));
 }
-
-#undef ROTATE_LEFT
-
-#undef F
-#undef G
-#undef H
-#undef I
-
-#undef FF
-#undef GG
-#undef HH
-#undef II
